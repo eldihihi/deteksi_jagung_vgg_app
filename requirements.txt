@@ -1,0 +1,7 @@
+streamlit
+tensorflow==2.18.0
+protobuf>=4.23.0,<5.0.0
+gdown
+numpy
+Pillow
+requests
