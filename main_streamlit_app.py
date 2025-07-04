@@ -1,4 +1,4 @@
-# main_streamlit_app.py (Untuk Model VGG16 Saja dengan Gemini API)
+# main_streamlit_app.py (Untuk Model EfficientNetB0 Saja dengan Gemini API)
 
 import streamlit as st
 import os
@@ -9,46 +9,46 @@ from PIL import Image # Digunakan untuk manipulasi gambar (misalnya, mengubah uk
 import requests # Digunakan untuk membuat permintaan HTTP ke Gemini API
 import json # Digunakan untuk mengurai respons JSON dari Gemini API
 
-# Impor fungsi pra-pemrosesan spesifik untuk VGG16
-from tensorflow.keras.applications.vgg16 import preprocess_input as vgg_preprocess
+# Import fungsi pra-pemrosesan spesifik untuk EfficientNetB0
+# EfficientNetB0 biasanya menggunakan preprocessing yang mirip dengan ResNet atau Inception,
+# atau cukup normalisasi 1./255. Jika ada masalah, kita bisa coba tf.keras.applications.efficientnet.preprocess_input
+# Namun, untuk EfficientNetB0 yang dilatih dengan ImageDataGenerator rescale=1./255,
+# normalisasi 1./255 sudah cukup.
+# Kita akan menggunakan normalisasi 1./255 secara langsung di preprocess_image_for_model.
 
 # --- Konfigurasi Model ---
 # Direktori untuk menyimpan model yang diunduh
 MODEL_DIR = "models"
 
-# Google Drive URL untuk model VGG16 Anda (menggunakan 'uc?id=' format untuk gdown)
-# PENTING: Pastikan URL ini benar dan file dapat diakses publik
+# Google Drive URL untuk model EfficientNetB0 Anda
+# PENTING: GANTI URL INI DENGAN URL MODEL efficientnetb0_fine_tuned_model.h5 ANDA!
 MODEL_URLS = {
-    "vgg": "https://drive.google.com/uc?id=1kKUN75slUQtEsqv8tULqAC-HIVy_OBU8" # URL VGG16
+    "efficientnet": "https://drive.google.com/uc?id=1EIvOgg48eLrj6gZ0gwV5uzOL06xN21Pv" # URL MODEL ANDA
 }
 
 # Nama file lokal untuk model
 MODEL_FILENAMES = {
-    "vgg": "vgg_best_model.h5"
+    "efficientnet": "efficientnetb0_fine_tuned_model.h5"
 }
 
-# Ukuran gambar input yang dibutuhkan oleh model VGG16
+# Ukuran gambar input yang dibutuhkan oleh model EfficientNetB0
 IMAGE_TARGET_SIZES = {
-    "vgg": (224, 224) # VGG16 biasanya membutuhkan 224x224
+    "efficientnet": (224, 224) # EfficientNetB0 membutuhkan 224x224
 }
 
-# Nama kelas untuk hasil prediksi
+# Nama kelas untuk hasil prediksi (pastikan urutannya sama dengan saat pelatihan)
 CLASS_NAMES = ['Blight', 'Common_Rust', 'Gray_Leaf_Spot', 'Healthy']
 
 # --- Gemini API Configuration ---
 # API Key akan disediakan oleh lingkungan Canvas saat runtime (__initial_auth_token)
 # Di Streamlit Cloud, Anda perlu menambahkan ini sebagai Secret.
-# Untuk pengujian lokal, Anda bisa masukkan API Key Gemini Anda di sini,
-# atau lebih baik, gunakan st.secrets jika sudah di-deploy.
-# Contoh: GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-# Untuk deployment di Canvas, biarkan kosong, Canvas akan mengisinya.
-GEMINI_API_KEY = "" # Ini akan diisi otomatis oleh Canvas
+GEMINI_API_KEY = "" # Ini akan diisi otomatis oleh Canvas/Streamlit Secrets
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
 # --- Helper Function for Image Preprocessing ---
 def preprocess_image_for_model(image_path, model_name):
     """
-    Memuat dan pra-memproses gambar sesuai dengan persyaratan model VGG16.
+    Memuat dan pra-memproses gambar sesuai dengan persyaratan model EfficientNetB0.
     """
     target_size = IMAGE_TARGET_SIZES.get(model_name)
     if not target_size:
@@ -59,21 +59,18 @@ def preprocess_image_for_model(image_path, model_name):
     img_array = np.array(img)
     img_array = np.expand_dims(img_array, axis=0) # Tambahkan dimensi batch
 
-    # Terapkan pra-pemrosesan spesifik VGG16
-    if model_name == "vgg":
-        return vgg_preprocess(img_array)
-    else:
-        # Fallback (seharusnya tidak terpakai jika hanya VGG)
-        return img_array / 255.0
+    # Untuk EfficientNetB0 yang dilatih dengan ImageDataGenerator rescale=1./255,
+    # cukup normalisasi 1./255.
+    return img_array / 255.0
 
 # --- Model Loading with Streamlit Caching ---
 # @st.cache_resource sangat penting di sini: memastikan model diunduh dan dimuat
 # hanya sekali di seluruh sesi pengguna, mencegah operasi berat berulang.
 # hash_funcs ditambahkan untuk memaksa cache di-invalidate jika ada perubahan internal.
 @st.cache_resource(show_spinner=False, hash_funcs={"_thread.RLock": lambda _: None})
-def load_vgg_model_cached():
+def load_efficientnet_model_cached():
     """
-    Mengunduh dan memuat model VGG16. Fungsi ini di-cache oleh Streamlit.
+    Mengunduh dan memuat model EfficientNetB0. Fungsi ini di-cache oleh Streamlit.
     """
     loaded_model = None
     
@@ -81,13 +78,13 @@ def load_vgg_model_cached():
     os.makedirs(MODEL_DIR, exist_ok=True)
     
     st.markdown("---")
-    st.write("Memulai proses memuat model VGG16 di latar belakang...")
+    st.write("Memulai proses memuat model EfficientNetB0 di latar belakang...")
     st.write("Ini mungkin memakan waktu beberapa menit, terutama pada deployment pertama.")
     
     # Gunakan placeholder untuk pesan dinamis
     status_placeholder = st.empty()
 
-    name = "vgg"
+    name = "efficientnet" # Nama model yang akan diunduh
     model_filepath = os.path.join(MODEL_DIR, MODEL_FILENAMES[name])
     
     # Unduh model jika belum ada
@@ -113,7 +110,7 @@ def load_vgg_model_cached():
         st.exception(e) # Tampilkan pengecualian lengkap di Streamlit
         return None # Menunjukkan kegagalan
             
-    status_placeholder.success("🎉 Model VGG16 berhasil dimuat dan siap digunakan!")
+    status_placeholder.success("🎉 Model EfficientNetB0 berhasil dimuat dan siap digunakan!")
     st.markdown("---")
     return loaded_model
 
@@ -122,27 +119,10 @@ def get_treatment_suggestions(plant_disease):
     """
     Calls the Gemini API to get treatment suggestions for a given plant disease.
     """
-    # In Streamlit Cloud, the API key is typically managed via st.secrets
-    # For local testing, you might need to set an environment variable or hardcode it (not recommended for production)
-    # For Canvas environment, __initial_auth_token will be used to get the API key.
-    # We will assume the API key is available via a global variable or st.secrets
-    
-    # Check if API key is available from st.secrets (typical for Streamlit Cloud deployment)
     api_key = st.secrets.get("GEMINI_API_KEY", "")
     if not api_key:
-        # Fallback for Canvas environment where __initial_auth_token is provided
-        # This part is specific to Canvas and might not work in generic Streamlit Cloud
-        if 'initial_auth_token' in st.session_state and st.session_state.initial_auth_token:
-            # In a real Canvas environment, this token would be used to authenticate
-            # and then fetch the actual API key. For simplicity here, we'll just
-            # use a placeholder or assume it's handled by the environment.
-            # For this specific scenario (calling generateContent), the API key
-            # is typically passed directly as a query parameter.
-            # The Canvas environment will inject the API key for the fetch call.
-            pass # API key will be injected by Canvas for the fetch call
-        else:
-            st.error("API Key untuk Gemini tidak ditemukan. Harap pastikan GEMINI_API_KEY diatur di Streamlit Secrets atau __initial_auth_token tersedia.")
-            return "Tidak dapat memberikan saran perawatan tanpa API Key."
+        st.error("API Key untuk Gemini tidak ditemukan. Harap pastikan GEMINI_API_KEY diatur di Streamlit Secrets.")
+        return "Tidak dapat memberikan saran perawatan tanpa API Key."
 
     prompt = f"Berikan saran perawatan singkat dan praktis untuk penyakit daun jagung: {plant_disease}. Fokus pada langkah-langkah yang bisa dilakukan petani. Berikan dalam bentuk poin-poin singkat."
     
@@ -153,9 +133,7 @@ def get_treatment_suggestions(plant_disease):
     
     try:
         with st.spinner(f"Mencari saran perawatan untuk {plant_disease} dari AI..."):
-            # The API key is added as a query parameter.
-            # In Canvas, the API key will be automatically provided if GEMINI_API_KEY is empty.
-            api_url_with_key = f"{GEMINI_API_URL}?key={api_key}" if api_key else GEMINI_API_URL
+            api_url_with_key = f"{GEMINI_API_URL}?key={api_key}"
             
             response = requests.post(api_url_with_key, headers={'Content-Type': 'application/json'}, data=json.dumps(payload))
             response.raise_for_status() # Raise an HTTPError for bad responses (4xx or 5xx)
@@ -182,7 +160,7 @@ def get_treatment_suggestions(plant_disease):
 
 # Set basic page configuration
 st.set_page_config(
-    page_title="Deteksi Penyakit Daun Jagung (VGG16 + Gemini AI)",
+    page_title="Deteksi Penyakit Daun Jagung (EfficientNetB0 + Gemini AI)",
     page_icon="🌽",
     layout="centered",
     initial_sidebar_state="collapsed"
@@ -191,16 +169,16 @@ st.set_page_config(
 # Application Title and Description
 st.title("🌽 Deteksi Penyakit Daun Jagung")
 st.markdown("""
-Aplikasi ini menggunakan model Convolutional Neural Network (CNN) **VGG16**
+Aplikasi ini menggunakan model Convolutional Neural Network (CNN) **EfficientNetB0**
 untuk mendeteksi penyakit pada daun jagung. Setelah deteksi, aplikasi akan memberikan saran perawatan
 menggunakan **Google Gemini AI**.
 """)
 
 # Call the cached model loading function
-vgg_model = load_vgg_model_cached()
+efficientnet_model = load_efficientnet_model_cached()
 
 # Check if model was loaded successfully
-if vgg_model is None:
+if efficientnet_model is None:
     st.error("Aplikasi tidak dapat berfungsi penuh karena ada masalah dalam memuat model. Silakan periksa log deployment.")
     st.stop() # Stop further execution if model is not loaded
 
@@ -228,14 +206,14 @@ if uploaded_file is not None:
     prediction_status_placeholder.info("Melakukan prediksi...")
 
     try:
-        # Preprocess image using the helper function for VGG
-        processed_image = preprocess_image_for_model(temp_image_path, "vgg")
+        # Preprocess image using the helper function for EfficientNetB0
+        processed_image = preprocess_image_for_model(temp_image_path, "efficientnet")
         
         # Debugging: Display processed image shape
-        st.write(f"DEBUG: Memproses VGG dengan shape: {processed_image.shape}") 
+        st.write(f"DEBUG: Memproses EfficientNetB0 dengan shape: {processed_image.shape}") 
         
-        # Predict with the VGG model
-        prediction = vgg_model.predict(processed_image)
+        # Predict with the EfficientNetB0 model
+        prediction = efficientnet_model.predict(processed_image)
         
         # Get predicted class index and confidence level
         predicted_class_index = np.argmax(prediction)
