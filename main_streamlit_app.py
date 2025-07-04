@@ -9,6 +9,9 @@ from PIL import Image # Digunakan untuk manipulasi gambar (misalnya, mengubah uk
 import requests # Digunakan untuk membuat permintaan HTTP ke Gemini API
 import json # Digunakan untuk mengurai respons JSON dari Gemini API
 
+# PENTING: Import efficientnet.tfkeras di sini agar fungsi 'swish' terdaftar
+import efficientnet.tfkeras as effnet 
+
 # Import fungsi pra-pemrosesan spesifik untuk EfficientNetB0
 # EfficientNetB0 biasanya menggunakan preprocessing yang mirip dengan ResNet atau Inception,
 # atau cukup normalisasi 1./255. Jika ada masalah, kita bisa coba tf.keras.applications.efficientnet.preprocess_input
